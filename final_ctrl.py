@@ -13,7 +13,7 @@ import my_hubo_ach as mha
 import ctrl_func as ctrl
 import hubo_fk as fk
 
-def getControlValues(state) 
+def getControlValues(state):
    result = mha.HUBO_CTRL()
 
    result.rleg = fk.getFK([
@@ -34,6 +34,46 @@ def getControlValues(state)
 
    return result
 
+phase = 0
+
+def getNextPosition(targetPose):
+   if phase == 0:
+      # first post, bend knees, change z position
+      targetPose.lleg[2] -= .1
+      targetPose.rleg[2] -= .1
+      phase += 1
+   elif phase == 1:
+      # sway over left
+      phase += 1
+   elif phase == 2:
+      # lift right leg
+      phase += 1
+   elif phase == 3:
+      # move right leg forward
+      phase += 1
+   elif phase == 4:
+      # sway over right
+      phase += 1
+   elif phase == 5:
+      # shift forward
+      phase += 1
+   elif phase == 6:
+      # lift left leg
+      phase += 1
+   elif phase == 7:
+      # move left leg forward
+      phase += 1
+   elif phase == 8:
+      # shift center / forward (zero position)
+      targetPose.lleg = [0, 0, 0, 0, 0, 0]
+      targetPose.rleg = [0, 0, 0, 0, 0, 0]
+      # go back to beginning
+      phase = 1
+
+   print 'Phase', phase
+
+   return targetPose
+
 # Open Hubo-Ach feed-forward (state) channels
 s = ach.Channel(ha.HUBO_CHAN_STATE_NAME)
 # open IK ctrl channel
@@ -53,20 +93,18 @@ ctrl = mha.HUBO_CTRL()
 [statuss, framesizes] = s.get(state, wait=False, last=False)
 
 # get the base positions
-ctrl = getControlValues(state, ctrl)
-
-targetPose = 
+targetPose = getControlValues(state, ctrl)
 
 while True:
    s.get(state, wait=False, last=True)
    t0 = state.time
 
-   ctrl = getControlValues(state, ctrl)    
-
-   # adjust ctrl values for next pose
-   getNextPosition(state, ctrl)
-
-   c.put(ctrl)
+   ctrl = getControlValues(state)
+   # check if we got there
+   if ik.getDist(ctrl, targetPose) <= .006:
+      # adjust ctrl values for next pose
+      targetPose = getNextPosition()
+      c.put(targetPose)
 
    s.get(state, wait=False, last=True)
    t1 = state.time
