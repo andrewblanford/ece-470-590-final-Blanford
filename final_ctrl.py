@@ -10,37 +10,42 @@ import time
 import math
 from ctypes import *
 import my_hubo_ach as mha
-import ctrl_func as ctrl
+import ctrl_func 
 import hubo_fk as fk
+import hubo_ik as ik
 
 def getControlValues(state):
    result = mha.HUBO_CTRL()
 
-   result.rleg = fk.getFK([
+   rightState = fk.getFK([
    state.joint[ha.RHY].pos,
    state.joint[ha.RHR].pos,
    state.joint[ha.RHP].pos,
-   state.joint[ha.RKP].pos,
+   state.joint[ha.RKN].pos,
    state.joint[ha.RAP].pos,
    state.joint[ha.RAR].pos], False, False)
 
-   result.lleg = fk.getFK([
+   leftState = fk.getFK([
    state.joint[ha.LHY].pos,
    state.joint[ha.LHR].pos,
    state.joint[ha.LHP].pos,
-   state.joint[ha.LKP].pos,
+   state.joint[ha.LKN].pos,
    state.joint[ha.LAP].pos,
    state.joint[ha.LAR].pos], False, False)
+
+   for i in range(len(rightState)):
+      result.rleg[i] = rightState[i]
+      result.lleg[i] = leftState[i]
 
    return result
 
 phase = 0
 
-def getNextPosition(targetPose):
+def getNextPosition(targetPose, phase):
    if phase == 0:
       # first post, bend knees, change z position
-      targetPose.lleg[2] -= .1
-      targetPose.rleg[2] -= .1
+      targetPose.lleg[2] += .1
+      targetPose.rleg[2] += .1
       phase += 1
    elif phase == 1:
       # sway over left
@@ -72,7 +77,7 @@ def getNextPosition(targetPose):
 
    print 'Phase', phase
 
-   return targetPose
+   return [targetPose, phase]
 
 # Open Hubo-Ach feed-forward (state) channels
 s = ach.Channel(ha.HUBO_CHAN_STATE_NAME)
@@ -93,22 +98,26 @@ ctrl = mha.HUBO_CTRL()
 [statuss, framesizes] = s.get(state, wait=False, last=False)
 
 # get the base positions
-targetPose = getControlValues(state, ctrl)
+targetPose = getControlValues(state)
+
+ERR = .006
 
 while True:
+   print 'step'
    s.get(state, wait=False, last=True)
    t0 = state.time
 
    ctrl = getControlValues(state)
    # check if we got there
-   if ik.getDist(ctrl, targetPose) <= .006:
+   if ((ik.getDist(ctrl.rleg, targetPose.rleg) <= ERR) 
+      and (ik.getDist(ctrl.lleg, targetPose.lleg) <= ERR)):
       # adjust ctrl values for next pose
-      targetPose = getNextPosition()
+      [targetPose, phase] = getNextPosition(targetPose, phase)
       c.put(targetPose)
 
    s.get(state, wait=False, last=True)
    t1 = state.time
-   ctrl.delay(TIME_STEP - max((t1 - t0), 0), s, state)
+   ctrl_func.delay(TIME_STEP - max((t1 - t0), 0), s, state)
 
 
 

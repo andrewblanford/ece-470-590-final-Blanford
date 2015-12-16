@@ -10,7 +10,8 @@ MakeAch()
 
 KillAch()
 {
-	sudo rm /dev/shm/achshm*  
+	sudo rm /dev/shm/achshm-$HUBO_IK_CHAN  
+	sudo rm /dev/shm/achshm-$HUBO_CTRL_CHAN  
 }
 
 Start()

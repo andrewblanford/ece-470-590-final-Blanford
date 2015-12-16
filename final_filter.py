@@ -28,8 +28,8 @@ freq = .2
 state = ha.HUBO_STATE()
 
 # feed-back will now be refered to as "ref"
-refPre = ha.HUBO_STATE()
-refPost = ha.HUBO_STATE()
+refPre = ha.HUBO_REF()
+refPost = ha.HUBO_REF()
 
 # Get the current feed-forward (state) 
 [statuss, framesizes] = s.get(state, wait=False, last=False)
@@ -38,19 +38,20 @@ jointsOfInterest = [
 ha.RHY,
 ha.RHR,
 ha.RHP,
-ha.RKP,
+ha.RKN,
 ha.RAP,
 ha.RAR,
 ha.LHY,
 ha.LHR,
 ha.LHP,
-ha.LKP,
+ha.LKN,
 ha.LAP,
 ha.LAR]
 
 while True:
    # get the IK output
    i.get(refPre, wait=True, last=True)
+   print 'Got update'
 
    # something updated... 
    updated = True
@@ -62,12 +63,14 @@ while True:
 
       # update each joint using the filter
       updated = False
-      for joint in len(jointsOfInterest):
+      for joint in range(len(jointsOfInterest)):
          j = jointsOfInterest[joint]
          if refPost.ref[j] != refPre.ref[j]:
             refPost.ref[j] = ctrl.filterTargetPos(refPre.ref[j], elapsed, freq)
             updated = True
    
+      r.put(refPost)
+
       elapsed += TIME_STEP
 
       # get end time
